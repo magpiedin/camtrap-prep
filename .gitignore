@@ -14,3 +14,4 @@ sdUploader.log
 test_camtrap_output
 test_upload
 test_draft_scripts
+*.csv
