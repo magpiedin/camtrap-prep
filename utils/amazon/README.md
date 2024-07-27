@@ -27,6 +27,33 @@
 # YOU DID IT
 
 ## Step 5
- - Cleanup the files converted by moving them from the raw folder to the converted folder (this keeps a backup and keeps track of the raw data)
- - 
+ - Cleanup the files converted by moving them from the raw folder to the [converted folder](https://drive.google.com/drive/u/1/folders/1avurttV3rAFLsgmTrnjE5nz2WO9W8Nm4) (this keeps a backup and keeps track of the raw data)
 
+
+---
+
+# Follow-up 
+After Observations are awesomely finished:
+
+## Step 6
+Process Camtrap-DP dataset from finished obs CSVs
+ 
+- Retrieve google doc
+- Format back to camtrap-dp observations table `camtrap_packager_2.py`
+- Format camtrap-dp media & deployment tables
+- Upload to GitHub UR data repo +/- MongoDB
+
+
+---
+
+# Back-log 
+
+## Step 1
+Process datasets from old camtrap-dp prep workflow in [Wildlife_Camera drive](https://drive.google.com/drive/u/1/folders/1WXqZzyEt-NcHk_o399rdXjuGvi88__1s)
+
+- Retrieve an observation CSV
+- Update env variables to reference google doc
+- Format back to camtrap-dp observations table using `camtrapRepackager.py`
+  - For media accessURIs, replace Google URLs with AWS URLs
+- Format camtrap-dp media & deployment tables
+- Upload to GitHub UR data repo +/- MongoDB
