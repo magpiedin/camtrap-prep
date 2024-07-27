@@ -1,9 +1,11 @@
 import sys
 import requests
+import os
 import pandas as pd
 from PIL import Image
 from PIL.ExifTags import TAGS
 from io import BytesIO
+import read_s3_public as rs3
 
 # TODO: Read deploymentID from argv
 # Usage: python filter_s3_keys.py <deploymentID> <optional: media>
@@ -19,8 +21,23 @@ def main():
     else:
         return print("Error: Specify Deployment ID")
 
-    # Read in the master list of all s3_keys
-    df_a = pd.read_csv("s3_keys.csv")
+    # run read_s3_public here 
+    if len(sys.argv) > 2:
+        read_s3_fresh = sys.argv[2]
+        if read_s3_fresh == "GET":
+            print("Getting fresh s3 keys with utils/amazon/read_s3_public.py")
+            df_a = rs3.get_s3_keys()
+        
+        else:
+            return print("Error: expected 'GET' to get fresh s3 keys, or nothing to read local s3_keys.csv")
+
+    else:
+        print("Reading local s3_keys.csv (add 'GET' to cli args to get fresh s3 keys)")
+        df_a = pd.read_csv("s3_keys.csv")
+
+    # Sort list of all s3_keys
+    # ...If no filters have been specified in read or filter scripts or in .env 'INPUT_S3_FILTER' variable, 
+    # ...then this will be full master list of keys
     df_a = df_a.sort_values(by='Key')
 
     # Filter the df to only the deploymentID and no sendlist
@@ -39,6 +56,10 @@ def main():
     # Generate observation base information for upload to google sheets
     images_df, videos_df = create_obs_csv(filtered_df, base_url)
 
+    # Check for output dir
+    if not os.path.isdir('./processed'):
+        os.makedirs('./processed')
+
     # Save the Images DataFrame to a CSV file
     images_df.to_csv(f'./processed/{filterID}_images.csv', index=False)
     print(f"Image Observations saved to {filterID}_images.csv")
@@ -46,8 +67,6 @@ def main():
     # Save the Videos DataFrame to a CSV file
     videos_df.to_csv(f'./processed/{filterID}_videos.csv', index=False)
     print(f"Video Observations saved to {filterID}_videos.csv")
-    
-
 
     return print('Job Complete')
 
