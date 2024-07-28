@@ -1,8 +1,8 @@
-'''DRAFT - Setup camtrap-dp package'''
-''' - from https://gitlab.com/oscf/camtrap-package '''
+'''DRAFT - Setup camtrap-dp package, with ref to media files on AWS S3'''
 
 import json, os, re
 import utils.camtrap_dp_terms as uc
+import utils.amazon.filter_s3_keys as utils_s3
 from dotenv import dotenv_values
 from exiftool import ExifToolHelper
 from frictionless import validate
@@ -68,6 +68,10 @@ def generate_deployments_datasets(
         input_data:dict=None
         ) -> list:
     '''Get sdUploader + image inputs for deployments'''
+
+    # TODO 
+    # - update this to use new folder-name-convention 
+    # - switch media-file-ref to pull from AWS S3 (`utils_s3` functions)
     
     deps_data_raw = None
     deps_table_blank = uc.get_deployments_table_schema()
@@ -100,6 +104,10 @@ def generate_deployments_datasets(
 
 def generate_media_datasets(file_path:str=None, input_data:dict=None) -> list:
     '''Get sdUploader + image inputs for media'''
+
+    # TODO 
+    # - update this to use new folder-name-convention 
+    # - switch media-file-ref to pull from AWS S3 (`utils_s3` functions)
     
     media_data = None
     image_batch = os.listdir(file_path)
@@ -143,6 +151,11 @@ def generate_media_datasets(file_path:str=None, input_data:dict=None) -> list:
 def generate_observations_datasets(
         media_table:list=None) -> list:
     '''Get sdUploader + image inputs for observations'''
+
+    # TODO 
+    # - update this to use new folder-name-convention 
+    # - switch media-file-ref to pull from AWS S3 (`utils_s3` functions)
+
     
     obs_data_raw = None
     obs_table_blank = uc.get_observations_table_schema()
