@@ -45,9 +45,10 @@ def get_s3_keys():
     '''main function to retrieve keys from sn s3 bucket, given a filter'''
 
     config = dotenv_values()
-
-    bucket_name = 'urbanriverrangers'
-    base_url = f'https://{bucket_name}.s3.amazonaws.com'
+    base_url = config['S3_BASE_URL']
+    if base_url is None:
+        print('Reminder: Set .env variable S3_BASE_URL to your AWS S3 base url')
+        base_url = "https://urbanriverrangers.s3.amazonaws.com"
 
     # Get filters
     filter = ''
