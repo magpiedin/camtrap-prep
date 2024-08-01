@@ -5,7 +5,7 @@ import pandas as pd
 from PIL import Image
 from PIL.ExifTags import TAGS
 from io import BytesIO
-import read_s3_public as rs3
+import utils.amazon.read_s3_public as rs3
 
 # TODO: Read deploymentID from argv
 # Usage: python filter_s3_keys.py <deploymentID> <optional: media>
