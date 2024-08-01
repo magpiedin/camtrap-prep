@@ -179,7 +179,7 @@ def prep_camtrap_dp(file_path_raw:sd.SdXDevice=None):
     '''
 
     if config['MODE'] == "TEST":
-        file_path = f"{config['INPUT_WORK_DIR']}{config['INPUT_IMAGE_DIR']}"
+        file_path = f"{config['WORK_FOLDER']}/{config['INPUT_IMAGE_DIR']}"
         
     else: 
         # TODO - check if mountpoint sd.SdXDevice is interchangeable with str
