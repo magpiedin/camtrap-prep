@@ -3,6 +3,7 @@
 import json, os, re, sys
 import pandas as pd
 import utils.camtrap_dp_terms as uc
+import utils.file_utils as uf
 import utils.amazon.filter_s3_keys as utils_s3
 from dotenv import dotenv_values
 from exiftool import ExifToolHelper
@@ -221,16 +222,17 @@ def prep_camtrap_dp(file_path_raw:str=None):  # sd.SdXDevice=None):
     or split out data_entry_info functions from main.SDCardUploaderGUI ? 
     '''
 
-    # TODO - Allow / check for CLI input 
-    if config['INPUT_DEPLOY_ID'] is not None and os.path.exists(f"{config['WORK_FOLDER']}/{config['INPUT_DEPLOY_ID']}"):
-        deploy_dir = f"{config['WORK_FOLDER']}/{config['INPUT_DEPLOY_ID']}"
-    else:
-        deploy_dir = f"{config['WORK_FOLDER']}/{sys.argv[1]}"
+    deploy_dir = uf.get_deployment_dir()
+
     
-    print(f"")
+    print(f"deployment_id directory = {deploy_dir}")
 
     if config['MODE'] == "TEST":
-        file_path = f"{deploy_dir}/{config['INPUT_IMAGE_DIR']}"
+        
+        # file_path = f"{deploy_dir}/{config['INPUT_IMAGE_DIR']}"
+        file_path = uf.get_image_dirs(deploy_dir = deploy_dir)
+
+        print(f"file path = {file_path}")
         
     # else: 
     #     # TODO - check if mountpoint sd.SdXDevice is interchangeable with str
