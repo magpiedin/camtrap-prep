@@ -38,7 +38,23 @@ def get_sduploader_input() -> dict:
         'notes' : None
     }
 
-    sd_input_path = config['INPUT_SDUPLOADER_DATA_ENTRY']
+    sd_input_path = None
+
+    if 'INPUT_SDUPLOADER_DATA_ENTRY' in config.keys():
+        sd_input_path = config['INPUT_SDUPLOADER_DATA_ENTRY']
+
+    # Read in camera-deployment info from info.txt (or camera_info.json)
+    if sd_input_path is None:
+        sd_input_dir = f"{config['WORK_FOLDER']}/{config['INPUT_DEPLOY_ID']}/"
+
+        if os.path.exists(f"{sd_input_dir}info.txt"):
+            sd_input_path = f"{sd_input_dir}info.txt"
+
+        elif os.path.exists(f"{sd_input_dir}camera_info.json"):
+            sd_input_path = f"{sd_input_dir}camera_info.json"
+
+
+    print(f'SD uploader data entry file: {sd_input_path}')
 
     if os.path.exists(sd_input_path):
         with open(sd_input_path) as file:
@@ -60,7 +76,7 @@ def get_sduploader_input() -> dict:
 
 def map_camtrap_dp_ur_profile(
         camtrap_profile:str=camtrap_profile_url,
-        generate_uuid4:bool=True
+        generate_uuid4:bool=False
         ) -> dict:
     '''map camera crew's input data to camtrap-dp metadata'''
 
@@ -68,6 +84,10 @@ def map_camtrap_dp_ur_profile(
 
     data_entry_info = get_sduploader_input()
 
+    dp_id = ""
+    if data_entry_info['date'] is not None and data_entry_info['camera'] is not None:
+        if len(data_entry_info['date']) > 0 and len(data_entry_info['camera']) > 0:
+            dp_id = f"{data_entry_info['date']}_{data_entry_info['camera']}"
     if generate_uuid4 == True:
         dp_id = str(uuid.uuid4())
     
@@ -152,11 +172,11 @@ def map_camtrap_dp_ur_profile(
         },
         'taxonomic' : [
             {
-                "scientificName": "Branta canadensis",
-                "taxonID": "https://www.checklistbank.org/dataset/292011/taxon/5WRC3",
-                "taxonRank": "species",
+                "scientificName": "Animalia",
+                "taxonID": "https://www.checklistbank.org/dataset/292011/taxon/N",
+                "taxonRank": "kingdom",
                 "vernacularNames": {
-                    "eng": "Canada goose"
+                    "eng": "Animals"
                     }
                 }
             ]
@@ -218,7 +238,7 @@ def map_to_camtrap_deployment(deployment_table:list=None,
     if len(re.findall(r'\.(jpg|jpeg)$', media_file_path.lower())) > 0:
         first_image_info = get_image_data(media_file_path)[0][0]
     else:
-        print(f'file path for GET_JPG{media_file_path}')
+        print(f'file path for GET_JPG = {media_file_path}')
         # file_list = os.listdir(media_file_path)
         first_image = get_jpg(media_file_path, search_string='\.(jpg|jpeg)$')
         first_image_info = get_image_data(first_image)[0][0]
@@ -329,7 +349,7 @@ def map_to_camtrap_media(media_table:list=None,
                     
                     image_path = google_file_list.loc[google_file_list['name'] == image['File:FileName'],'webContentLink'].item()
                 else:
-                    image_path = re.sub(f"{config['INPUT_WORK_DIR']}", "", image['File:Directory'])
+                    image_path = re.sub(f"{config['WORK_FOLDER']}/", "", image['File:Directory'])
 
                 media_map = {
                     "mediaID" : media_id,  # Required
@@ -414,7 +434,7 @@ def map_to_camtrap_observations(observations_table:list=None,
                 'observationLevel' : 'media',
                 'observationType' : 'unclassified',
                 "cameraSetupType" : None,
-                "scientificName" : None,
+                "scientificName" : '',
                 "count" : None,
                 "lifeStage" : None,
                 "sex" : None,
@@ -448,8 +468,8 @@ def map_to_camtrap_observations(observations_table:list=None,
 
 def get_temporal_data(media_table):
 
-    start = media_table['timestamp'].min()
-    end = media_table['timestamp'].max()
+    start = media_table['timestamp'].min()  # replace with ref to camera inventory?
+    end = media_table['timestamp'].max()  # replace with ref to INPUT_DEPLOY_ID date?
 
     temporal_data = {
         'start' : start,
@@ -458,41 +478,57 @@ def get_temporal_data(media_table):
 
     return temporal_data
 
-def get_taxonomic_data(get_obs_table:bool=False):
+def get_taxonomic_data(get_obs_table:bool=False, obs_table=None):
 
     obs_xls_file = config['INPUT_OBSERVATION_XLSX']
+
+    if obs_table is None:
+        obs_table = pd.read_excel(obs_xls_file, 
+                                  # sheet_name='observations',  # default = 0 / first sheet
+                                  header=1,  # TODO - only apply this for post-2024-june data
+                                  skiprows=0  # TODO - only apply this for post-2024-june data
+                                  )
 
     if get_obs_table is True:  # and os.path.isfile(obs_xls_file):
 
         try:
-            obs_table = pd.read_excel(obs_xls_file, sheet_name='observations')
+                
             tax_table = csv_tools.rows(file = config['INPUT_TAXON_LOOKUP'])
             
             taxonomic_data = []
 
-            for taxon in obs_table.scientificName.dropna().unique():
+            print(f'len obs_table is {len(obs_table)}')
 
-                prepped_row = {
-                    "scientificName": taxon,
-                    "taxonID": None,
-                    "taxonRank": None,
-                    "vernacularNames": None
-                }
+            if obs_table is not None:
 
-                taxID = [match_row.get('taxonID') for match_row in tax_table if match_row['speciesName'] == taxon]
-                if len(taxID) > 0:
-                    prepped_row['taxonID'] = taxID[0]
-    
-                taxRank = [match_row.get('taxonRank') for match_row in tax_table if match_row['speciesName'] == taxon]
-                if len(taxRank) > 0:
-                    prepped_row['taxonRank'] = taxRank[0]
+                print(f'obs_table is NOT NONE YAY -- first 5:  {obs_table[0:5]}')
 
-                vernacular = [match_row.get('Common Name') for match_row in tax_table if match_row['speciesName'] == taxon]
-                if len(vernacular) > 0:
-                    prepped_row['vernacularNames'] = {'eng': vernacular[0]}
+                for taxon in obs_table.scientificName.dropna().unique():
 
-                if prepped_row not in taxonomic_data:
-                    taxonomic_data.append(prepped_row)
+                    prepped_row = {
+                        "scientificName": taxon,
+                        "taxonID": '',
+                        "taxonRank": '',
+                        "vernacularNames": ''
+                    }
+
+                    taxID = [match_row.get('taxonID') for match_row in tax_table if match_row['speciesName'] == taxon]
+                    if len(taxID) > 0:
+                        print(f'taxID list = {taxID}')
+                        prepped_row['taxonID'] = taxID[0]
+        
+                    taxRank = [match_row.get('taxonRank') for match_row in tax_table if match_row['speciesName'] == taxon]
+                    if len(taxRank) > 0:
+                        print(f'taxRank list = {taxRank}')
+                        prepped_row['taxonRank'] = taxRank[0]
+
+                    vernacular = [match_row.get('Common Name') for match_row in tax_table if match_row['speciesName'] == taxon]
+                    if len(vernacular) > 0:
+                        print(f'eng-vernacular list = {vernacular}')
+                        prepped_row['vernacularNames'] = {'eng': vernacular[0]}
+
+                    if prepped_row not in taxonomic_data:
+                        taxonomic_data.append(prepped_row)
         
         except FileNotFoundError:
             print(f'File not found: {obs_xls_file} -- Check the value for "INPUT_OBSERVATION_XLSX" in the .env file. It should point to an appropriate excel file')
@@ -500,12 +536,21 @@ def get_taxonomic_data(get_obs_table:bool=False):
         
     else:
         
+        # taxonomic_data = [{
+        #     "scientificName": "Branta canadensis",
+        #     "taxonID": "https://www.checklistbank.org/dataset/292011/taxon/5WRC3",
+        #     "taxonRank": "species",
+        #     "vernacularNames": {
+        #         "eng": "Canada goose"
+        #         }
+        #     }]
+        
         taxonomic_data = [{
-            "scientificName": "Branta canadensis",
-            "taxonID": "https://www.checklistbank.org/dataset/292011/taxon/5WRC3",
-            "taxonRank": "species",
+            "scientificName": "Animalia",
+            "taxonID": "https://www.checklistbank.org/dataset/292011/taxon/N",
+            "taxonRank": "kingdom",
             "vernacularNames": {
-                "eng": "Canada goose"
+                "eng": "Animals"
                 }
             }]
 
@@ -525,6 +570,7 @@ class CamtrapPackage():
             resources_prepped:list=None,
             media_table:list=None,
             get_obs_table:bool=False,
+            obs_table:list=None
             ) -> None:
         
         if profile_dict is None:
@@ -550,7 +596,7 @@ class CamtrapPackage():
 
         self.spatial = profile_dict['spatial']
         self.temporal = get_temporal_data(media_table)
-        self.taxonomic = get_taxonomic_data(get_obs_table)  # profile_dict['taxonomic']
+        self.taxonomic = get_taxonomic_data(get_obs_table, obs_table)  # profile_dict['taxonomic']
 
         self.resources = resources_prepped
 

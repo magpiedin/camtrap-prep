@@ -3,7 +3,7 @@
 
 import json, os, re
 import pandas as pd
-import sdUploader as sd
+# import sdUploader as sd
 import utils.camtrap_dp_terms as uc
 import utils.google_drive as ug
 from dotenv import dotenv_values
@@ -23,7 +23,7 @@ camtrap_config_urls['observations'] = f"{camtrap_config_urls['base_url']}{config
 camtrap_config_urls['output'] = config['CAMTRAP_OUTPUT_DIR']
 
 def get_camtrap_dp_metadata(
-        file_path_raw:sd.SdXDevice = None, 
+        file_path_raw = None, 
         # sd_data_entry_info:dict = None,
         resources_prepped:list = None,
         media_table:list = None,
@@ -187,7 +187,7 @@ def generate_observations_datasets(
 def repackage_dp(obs_xls_file:str=config['INPUT_OBSERVATION_XLSX'], obs_data_filename:str=None):
     '''import manually-edited camtrap-dp 'observation' csv'''
 
-    # # folder_to_check=f"{config['INPUT_WORK_DIR']}"
+    # # folder_to_check=f"{config['WORK_FOLDER']}"
 
     # # find excel file in folder_to_check
     # obs_xls_file = config['INPUT_OBSERVATION_XLSX']
@@ -208,19 +208,19 @@ def repackage_dp(obs_xls_file:str=config['INPUT_OBSERVATION_XLSX'], obs_data_fil
     return prepped_obs_data
 
 
-def prep_camtrap_dp(file_path_raw:sd.SdXDevice=None):
+def prep_camtrap_dp(file_path_raw=None):
     '''Prep Data from SDuploader media and output it a camtrap-dp dataset'''
     '''
     TODO - reference these functions in main.SDCardUploaderGUI.data_entry_info? 
     or split out data_entry_info functions from main.SDCardUploaderGUI ? 
     '''
 
-    if config['MODE'] == "TEST":
-        file_path = f"{config['INPUT_WORK_DIR']}{config['INPUT_IMAGE_DIR']}"
+    # if config['MODE'] == "TEST":
+    file_path = f"{config['WORK_FOLDER']}/{config['INPUT_IMAGE_DIR']}"
         
-    else: 
-        # TODO - check if mountpoint sd.SdXDevice is interchangeable with str
-        file_path = file_path_raw.mountpoint
+    # else: 
+    #     # TODO - check if mountpoint sd.SdXDevice is interchangeable with str
+    #     file_path = file_path_raw.mountpoint
 
     data_entry_info = uc.get_sduploader_input()
 

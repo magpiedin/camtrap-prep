@@ -1,9 +1,10 @@
-'''DRAFT - Setup camtrap-dp package'''
-''' - from https://gitlab.com/oscf/camtrap-package '''
+'''DRAFT - Setup camtrap-dp package, with ref to media files on AWS S3'''
 
-import json, os, re
-import sdUploader as sd
+import json, os, re, sys
+import pandas as pd
 import utils.camtrap_dp_terms as uc
+import utils.file_utils as uf
+import utils.amazon.filter_s3_keys as utils_s3
 from dotenv import dotenv_values
 from exiftool import ExifToolHelper
 from frictionless import validate
@@ -21,17 +22,20 @@ camtrap_config_urls['observations'] = f"{camtrap_config_urls['base_url']}{config
 camtrap_config_urls['output'] = config['CAMTRAP_OUTPUT_DIR']
 
 def get_camtrap_dp_metadata(
-        file_path_raw:sd.SdXDevice = None, 
+        file_path_raw:str = None, 
         # sd_data_entry_info:dict = None,
         resources_prepped:list = None,
-        media_table:list = None
+        media_table:list = None,
+        obs_table = None
         ) -> uc.CamtrapPackage:
     '''Setup metadata + resources datapackage.json as a camtrap package'''
     
     descriptor = uc.CamtrapPackage(
         profile_dict = None,
         resources_prepped = resources_prepped,
-        media_table = media_table)
+        media_table = media_table,
+        get_obs_table=False,
+        obs_table = obs_table)
 
     return descriptor
 
@@ -69,6 +73,10 @@ def generate_deployments_datasets(
         input_data:dict=None
         ) -> list:
     '''Get sdUploader + image inputs for deployments'''
+
+    # TODO 
+    # - update this to use new folder-name-convention 
+    # - switch media-file-ref to pull from AWS S3 (`utils_s3` functions)
     
     deps_data_raw = None
     deps_table_blank = uc.get_deployments_table_schema()
@@ -101,6 +109,10 @@ def generate_deployments_datasets(
 
 def generate_media_datasets(file_path:str=None, input_data:dict=None) -> list:
     '''Get sdUploader + image inputs for media'''
+
+    # TODO 
+    # - update this to use new folder-name-convention 
+    # - switch media-file-ref to pull from AWS S3 (`utils_s3` functions)
     
     media_data = None
     image_batch = os.listdir(file_path)
@@ -112,21 +124,21 @@ def generate_media_datasets(file_path:str=None, input_data:dict=None) -> list:
         media_row_blank = uc.get_media_table_schema()
         media_row = None
 
-        with ExifToolHelper() as et:
-            for image in image_batch:
+        # with ExifToolHelper() as et:
+        for image in image_batch:
 
-                if os.path.isfile(f'{file_path}/{image}') == True: # and re.find(r'\.[jpg|cr2|rw2|]', image.lower()) is not None:
+            if os.path.isfile(f'{file_path}/{image}') == True: # and re.find(r'\.[jpg|cr2|rw2|]', image.lower()) is not None:
 
-                    # Skip hidden .DS_Store files if present
-                    if len(re.findall(r".*DS_Store.*", f'{file_path}/{image}')) > 0:
-                        pass
-                    else:
+                # Skip hidden .DS_Store files if present
+                if len(re.findall(r".*DS_Store.*", f'{file_path}/{image}')) > 0:
+                    pass
+                else:
 
-                        media_row = uc.map_to_camtrap_media(
-                            media_table=media_row_blank, input_data=input_data,
-                            media_file_path=f"{file_path}/{image}")
-                        if media_row is not None:
-                            media_raw_data.append(media_row)
+                    media_row = uc.map_to_camtrap_media(
+                        media_table=media_row_blank, input_data=input_data,
+                        media_file_path=f"{file_path}/{image}")
+                    if media_row is not None:
+                        media_raw_data.append(media_row)
 
         media_data_filename = f"{camtrap_config_urls['output']}/media.csv"
 
@@ -144,46 +156,130 @@ def generate_media_datasets(file_path:str=None, input_data:dict=None) -> list:
 def generate_observations_datasets(
         media_table:list=None) -> list:
     '''Get sdUploader + image inputs for observations'''
+
+    # TODO 
+    # - update this to use new folder-name-convention 
+    # - switch media-file-ref to pull from AWS S3 (`utils_s3` functions)
+
+    obs_data_filename = f"{camtrap_config_urls['output']}/observations.csv"
+
+    if os.path.isfile(config['INPUT_OBSERVATION_XLSX']):
+
+        obs_data = repackage_dp_v2(
+            obs_xls_file = config['INPUT_OBSERVATION_XLSX'],
+            obs_data_filename = obs_data_filename
+            )
     
-    obs_data_raw = None
-    obs_table_blank = uc.get_observations_table_schema()
+    else:
+        obs_data_raw = None
+        obs_table_blank = uc.get_observations_table_schema()
 
-    if media_table is not None:
+        if media_table is not None:
 
-        obs_data_raw = uc.map_to_camtrap_observations(
-            observations_table = obs_table_blank,
-            media_table = media_table
-        )
+            obs_data_raw = uc.map_to_camtrap_observations(
+                observations_table = obs_table_blank,
+                media_table = media_table
+            )
 
-        obs_data_filename = f"{camtrap_config_urls['output']}/observations.csv"
+            obs_data = DataFrame(obs_data_raw)
+            obs_data.to_csv(obs_data_filename, 
+                            index=False,
+                            )
+            
+    print(f'observations_data preview: ')
+    print(obs_data[:5])
 
-        obs_data = DataFrame(obs_data_raw)
-        obs_data.to_csv(obs_data_filename, 
-                        index=False,
-                        )
-        
-        print(f'observations_data preview: ')
-        print(obs_data[:5])
-
-        obs_data_valid = validate(obs_data_filename)
-        print(f'obs data validations:  {obs_data_valid}')
+    obs_data_valid = validate(obs_data_filename)
+    print(f'obs data validations:  {obs_data_valid}')
     
     return obs_data
 
 
-def prep_camtrap_dp(file_path_raw:sd.SdXDevice=None):
+def repackage_dp(obs_xls_file:str=config['INPUT_OBSERVATION_XLSX'], obs_data_filename:str=None):
+    '''import manually-edited camtrap-dp 'observation' csv from old workflow / up to ~june 2024'''
+
+    # # folder_to_check=f"{config['WORK_FOLDER']}"
+
+    # # find excel file in folder_to_check
+    # obs_xls_file = config['INPUT_OBSERVATION_XLSX']
+
+    # read in the "observations" tab of that excel file
+    obs_data = pd.read_excel(obs_xls_file,
+                             # sheet_name='observations',  # default = 0 / first sheet
+                             )
+
+    # format the obs table / conform to the observation schema
+    obs_data = DataFrame(obs_data)
+    obs_data_filename = f"{camtrap_config_urls['output']}/observations.csv"
+
+    prepped_obs_data = obs_data.drop('Common Name', axis = 1)
+
+    # output to CSV for camtrap-dp
+    prepped_obs_data.to_csv(obs_data_filename, 
+                    index=False,
+                    )
+
+    return prepped_obs_data
+
+
+def repackage_dp_v2(obs_xls_file:str=config['INPUT_OBSERVATION_XLSX'], obs_data_filename:str=None):
+    '''import manually-edited camtrap-dp 'observation' table from new workflow / post ~june 2024'''
+
+    # NOTE - 2024-aug - this currently requires:
+    # 1 - the obs XLSX to be manually saved locally
+    # 2 - the .env to be manually updated to point INPUT_OBSERVATION_XLSX to local xlsx file
+
+    print(f'reading observation-sheet from .env INPUT_OBSERVATION_XLSX:  {obs_xls_file}')
+
+    # read in the "observations" tab of a new observation sheet
+    # skip 1st row, and use 2nd row as headers
+    obs_data = pd.read_excel(obs_xls_file,
+                             # sheet_name='observations',  # default = 0 / first sheet
+                             header=1, 
+                             skiprows=0)
+
+    # Fill in gap-rows if present, where multiple observation-rows relate to the same media-file
+    obs_data = DataFrame(obs_data).ffill(axis = 0)
+
+    # reformat the obs table to conform to the observation schema
+    # NOTE - reset index / maybe not needed
+    obs_data = obs_data.drop('commonName', axis = 1)
+    obs_schema = DataFrame(uc.get_observations_table_schema())
+    prepped_obs_data = pd.concat([obs_schema, obs_data]).reset_index(drop = True)
+
+    # output to CSV for camtrap-dp
+    obs_data_filename = f"{camtrap_config_urls['output']}/observations.csv"
+
+    prepped_obs_data.to_csv(
+        obs_data_filename, 
+        index=False,
+        )
+
+    return prepped_obs_data
+
+
+def prep_camtrap_dp(file_path_raw:str=None):  # sd.SdXDevice=None):
     '''Prep Data from SDuploader media and output it a camtrap-dp dataset'''
     '''
     TODO - reference these functions in main.SDCardUploaderGUI.data_entry_info? 
     or split out data_entry_info functions from main.SDCardUploaderGUI ? 
     '''
 
+    deploy_dir = uf.get_deployment_dir()
+
+    
+    print(f"deployment_id directory = {deploy_dir}")
+
     if config['MODE'] == "TEST":
-        file_path = f"{config['WORK_FOLDER']}/{config['INPUT_IMAGE_DIR']}"
         
-    else: 
-        # TODO - check if mountpoint sd.SdXDevice is interchangeable with str
-        file_path = file_path_raw.mountpoint
+        # file_path = f"{deploy_dir}/{config['INPUT_IMAGE_DIR']}"
+        file_path = uf.get_image_dirs(deploy_dir = deploy_dir)
+
+        print(f"file path = {file_path}")
+        
+    # else: 
+    #     # TODO - check if mountpoint sd.SdXDevice is interchangeable with str
+    #     file_path = file_path_raw.mountpoint
 
     data_entry_info = uc.get_sduploader_input()
 
@@ -206,7 +302,7 @@ def prep_camtrap_dp(file_path_raw:sd.SdXDevice=None):
         )
 
     # Generate observations.CSV
-    generate_observations_datasets(
+    obs_data = generate_observations_datasets(
         media_table = media_data
         )
     
@@ -235,7 +331,8 @@ def prep_camtrap_dp(file_path_raw:sd.SdXDevice=None):
         file_path_raw = file_path_raw, 
         # sd_data_entry_info = data_entry_info,
         resources_prepped = data_resources,
-        media_table = media_data
+        media_table = media_data,
+        obs_table = obs_data,
         )
 
 
