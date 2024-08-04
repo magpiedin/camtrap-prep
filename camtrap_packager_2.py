@@ -244,7 +244,7 @@ def repackage_dp_v2(obs_xls_file:str=config['INPUT_OBSERVATION_XLSX'], obs_data_
     # reformat the obs table to conform to the observation schema
     # NOTE - reset index / maybe not needed
     obs_data = obs_data.drop('commonName', axis = 1)
-    obs_schema = uc.get_observations_table_schema()
+    obs_schema = DataFrame(uc.get_observations_table_schema())
     prepped_obs_data = pd.concat([obs_schema, obs_data]).reset_index(drop = True)
 
     # output to CSV for camtrap-dp
