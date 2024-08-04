@@ -25,14 +25,17 @@ def get_camtrap_dp_metadata(
         file_path_raw:str = None, 
         # sd_data_entry_info:dict = None,
         resources_prepped:list = None,
-        media_table:list = None
+        media_table:list = None,
+        obs_table = None
         ) -> uc.CamtrapPackage:
     '''Setup metadata + resources datapackage.json as a camtrap package'''
     
     descriptor = uc.CamtrapPackage(
         profile_dict = None,
         resources_prepped = resources_prepped,
-        media_table = media_table)
+        media_table = media_table,
+        get_obs_table=False,
+        obs_table = obs_table)
 
     return descriptor
 
@@ -161,7 +164,8 @@ def generate_observations_datasets(
     obs_data_filename = f"{camtrap_config_urls['output']}/observations.csv"
 
     if os.path.isfile(config['INPUT_OBSERVATION_XLSX']):
-        obs_data = repackage_dp(
+
+        obs_data = repackage_dp_v2(
             obs_xls_file = config['INPUT_OBSERVATION_XLSX'],
             obs_data_filename = obs_data_filename
             )
@@ -192,7 +196,7 @@ def generate_observations_datasets(
 
 
 def repackage_dp(obs_xls_file:str=config['INPUT_OBSERVATION_XLSX'], obs_data_filename:str=None):
-    '''import manually-edited camtrap-dp 'observation' csv'''
+    '''import manually-edited camtrap-dp 'observation' csv from old workflow / up to ~june 2024'''
 
     # # folder_to_check=f"{config['WORK_FOLDER']}"
 
@@ -200,7 +204,9 @@ def repackage_dp(obs_xls_file:str=config['INPUT_OBSERVATION_XLSX'], obs_data_fil
     # obs_xls_file = config['INPUT_OBSERVATION_XLSX']
 
     # read in the "observations" tab of that excel file
-    obs_data = pd.read_excel(obs_xls_file, sheet_name='observations')
+    obs_data = pd.read_excel(obs_xls_file,
+                             # sheet_name='observations',  # default = 0 / first sheet
+                             )
 
     # format the obs table / conform to the observation schema
     obs_data = DataFrame(obs_data)
@@ -208,9 +214,46 @@ def repackage_dp(obs_xls_file:str=config['INPUT_OBSERVATION_XLSX'], obs_data_fil
 
     prepped_obs_data = obs_data.drop('Common Name', axis = 1)
 
+    # output to CSV for camtrap-dp
     prepped_obs_data.to_csv(obs_data_filename, 
                     index=False,
                     )
+
+    return prepped_obs_data
+
+
+def repackage_dp_v2(obs_xls_file:str=config['INPUT_OBSERVATION_XLSX'], obs_data_filename:str=None):
+    '''import manually-edited camtrap-dp 'observation' table from new workflow / post ~june 2024'''
+
+    # NOTE - 2024-aug - this currently requires:
+    # 1 - the obs XLSX to be manually saved locally
+    # 2 - the .env to be manually updated to point INPUT_OBSERVATION_XLSX to local xlsx file
+
+    print(f'reading observation-sheet from .env INPUT_OBSERVATION_XLSX:  {obs_xls_file}')
+
+    # read in the "observations" tab of a new observation sheet
+    # skip 1st row, and use 2nd row as headers
+    obs_data = pd.read_excel(obs_xls_file,
+                             # sheet_name='observations',  # default = 0 / first sheet
+                             header=1, 
+                             skiprows=0)
+
+    # Fill in gap-rows if present, where multiple observation-rows relate to the same media-file
+    obs_data = DataFrame(obs_data).ffill(axis = 0)
+
+    # reformat the obs table to conform to the observation schema
+    # NOTE - reset index / maybe not needed
+    obs_data = obs_data.drop('commonName', axis = 1)
+    obs_schema = uc.get_observations_table_schema()
+    prepped_obs_data = pd.concat([obs_schema, obs_data]).reset_index(drop = True)
+
+    # output to CSV for camtrap-dp
+    obs_data_filename = f"{camtrap_config_urls['output']}/observations.csv"
+
+    prepped_obs_data.to_csv(
+        obs_data_filename, 
+        index=False,
+        )
 
     return prepped_obs_data
 
@@ -259,7 +302,7 @@ def prep_camtrap_dp(file_path_raw:str=None):  # sd.SdXDevice=None):
         )
 
     # Generate observations.CSV
-    generate_observations_datasets(
+    obs_data = generate_observations_datasets(
         media_table = media_data
         )
     
@@ -288,7 +331,8 @@ def prep_camtrap_dp(file_path_raw:str=None):  # sd.SdXDevice=None):
         file_path_raw = file_path_raw, 
         # sd_data_entry_info = data_entry_info,
         resources_prepped = data_resources,
-        media_table = media_data
+        media_table = media_data,
+        obs_table = obs_data,
         )
 
 

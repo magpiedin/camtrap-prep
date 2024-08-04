@@ -20,7 +20,11 @@ camtrap_observations_schema_url = f'{camtrap_base_url}{config["CAMTRAP_OBSERVATI
 def get_deployment_dir():
     '''Combine the work-folder and deployment id to form / match the server's deployment directory path'''
 
-    # TODO - Allow / check for CLI input 
+    # # TODO - Allow / check for CLI input 
+    # print(config['INPUT_DEPLOY_ID'])
+    # print(f"{config['WORK_FOLDER']}/{config['INPUT_DEPLOY_ID']}")
+    # print(os.path.exists(f"{config['WORK_FOLDER']}/{config['INPUT_DEPLOY_ID']}"))
+
     if config['INPUT_DEPLOY_ID'] is not None and os.path.exists(f"{config['WORK_FOLDER']}/{config['INPUT_DEPLOY_ID']}"):
         deploy_dir = f"{config['WORK_FOLDER']}/{config['INPUT_DEPLOY_ID']}"
     else:

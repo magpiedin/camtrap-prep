@@ -468,8 +468,8 @@ def map_to_camtrap_observations(observations_table:list=None,
 
 def get_temporal_data(media_table):
 
-    start = media_table['timestamp'].min()
-    end = media_table['timestamp'].max()
+    start = media_table['timestamp'].min()  # replace with ref to camera inventory?
+    end = media_table['timestamp'].max()  # replace with ref to INPUT_DEPLOY_ID date?
 
     temporal_data = {
         'start' : start,
@@ -478,41 +478,57 @@ def get_temporal_data(media_table):
 
     return temporal_data
 
-def get_taxonomic_data(get_obs_table:bool=False):
+def get_taxonomic_data(get_obs_table:bool=False, obs_table=None):
 
     obs_xls_file = config['INPUT_OBSERVATION_XLSX']
+
+    if obs_table is None:
+        obs_table = pd.read_excel(obs_xls_file, 
+                                  # sheet_name='observations',  # default = 0 / first sheet
+                                  header=1,  # TODO - only apply this for post-2024-june data
+                                  skiprows=0  # TODO - only apply this for post-2024-june data
+                                  )
 
     if get_obs_table is True:  # and os.path.isfile(obs_xls_file):
 
         try:
-            obs_table = pd.read_excel(obs_xls_file, sheet_name='observations')
+                
             tax_table = csv_tools.rows(file = config['INPUT_TAXON_LOOKUP'])
             
             taxonomic_data = []
 
-            for taxon in obs_table.scientificName.dropna().unique():
+            print(f'len obs_table is {len(obs_table)}')
 
-                prepped_row = {
-                    "scientificName": taxon,
-                    "taxonID": '',
-                    "taxonRank": '',
-                    "vernacularNames": ''
-                }
+            if obs_table is not None:
 
-                taxID = [match_row.get('taxonID') for match_row in tax_table if match_row['speciesName'] == taxon]
-                if len(taxID) > 0:
-                    prepped_row['taxonID'] = taxID[0]
-    
-                taxRank = [match_row.get('taxonRank') for match_row in tax_table if match_row['speciesName'] == taxon]
-                if len(taxRank) > 0:
-                    prepped_row['taxonRank'] = taxRank[0]
+                print(f'obs_table is NOT NONE YAY -- first 5:  {obs_table[0:5]}')
 
-                vernacular = [match_row.get('Common Name') for match_row in tax_table if match_row['speciesName'] == taxon]
-                if len(vernacular) > 0:
-                    prepped_row['vernacularNames'] = {'eng': vernacular[0]}
+                for taxon in obs_table.scientificName.dropna().unique():
 
-                if prepped_row not in taxonomic_data:
-                    taxonomic_data.append(prepped_row)
+                    prepped_row = {
+                        "scientificName": taxon,
+                        "taxonID": '',
+                        "taxonRank": '',
+                        "vernacularNames": ''
+                    }
+
+                    taxID = [match_row.get('taxonID') for match_row in tax_table if match_row['speciesName'] == taxon]
+                    if len(taxID) > 0:
+                        print(f'taxID list = {taxID}')
+                        prepped_row['taxonID'] = taxID[0]
+        
+                    taxRank = [match_row.get('taxonRank') for match_row in tax_table if match_row['speciesName'] == taxon]
+                    if len(taxRank) > 0:
+                        print(f'taxRank list = {taxRank}')
+                        prepped_row['taxonRank'] = taxRank[0]
+
+                    vernacular = [match_row.get('Common Name') for match_row in tax_table if match_row['speciesName'] == taxon]
+                    if len(vernacular) > 0:
+                        print(f'eng-vernacular list = {vernacular}')
+                        prepped_row['vernacularNames'] = {'eng': vernacular[0]}
+
+                    if prepped_row not in taxonomic_data:
+                        taxonomic_data.append(prepped_row)
         
         except FileNotFoundError:
             print(f'File not found: {obs_xls_file} -- Check the value for "INPUT_OBSERVATION_XLSX" in the .env file. It should point to an appropriate excel file')
@@ -530,11 +546,11 @@ def get_taxonomic_data(get_obs_table:bool=False):
         #     }]
         
         taxonomic_data = [{
-            "scientificName": "",
-            "taxonID": "",
-            "taxonRank": "",
+            "scientificName": "Animalia",
+            "taxonID": "https://www.checklistbank.org/dataset/292011/taxon/N",
+            "taxonRank": "kingdom",
             "vernacularNames": {
-                "eng": ""
+                "eng": "Animals"
                 }
             }]
 
@@ -554,6 +570,7 @@ class CamtrapPackage():
             resources_prepped:list=None,
             media_table:list=None,
             get_obs_table:bool=False,
+            obs_table:list=None
             ) -> None:
         
         if profile_dict is None:
@@ -579,7 +596,7 @@ class CamtrapPackage():
 
         self.spatial = profile_dict['spatial']
         self.temporal = get_temporal_data(media_table)
-        self.taxonomic = get_taxonomic_data(get_obs_table)  # profile_dict['taxonomic']
+        self.taxonomic = get_taxonomic_data(get_obs_table, obs_table)  # profile_dict['taxonomic']
 
         self.resources = resources_prepped
 
