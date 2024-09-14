@@ -45,7 +45,9 @@ def get_sduploader_input() -> dict:
 
     # Read in camera-deployment info from info.txt (or camera_info.json)
     if sd_input_path is None:
+        # TODO - inherit this from sdUploader input -- info.txt &/or camera_info.json
         sd_input_dir = f"{config['WORK_FOLDER']}/{config['INPUT_DEPLOY_ID']}/"
+        print(f'SD uploader input dir: {sd_input_dir}')
 
         if os.path.exists(f"{sd_input_dir}info.txt"):
             sd_input_path = f"{sd_input_dir}info.txt"
@@ -349,7 +351,11 @@ def map_to_camtrap_media(media_table:list=None,
                     
                     image_path = google_file_list.loc[google_file_list['name'] == image['File:FileName'],'webContentLink'].item()
                 else:
-                    image_path = re.sub(f"{config['WORK_FOLDER']}/", "", image['File:Directory'])
+                    # image_path = re.sub(f"{config['WORK_FOLDER']}/", "", image['File:Directory'])
+                    path_base = config['S3_BASE_URL']
+                    deploy_subdir = re.sub(f"{config['WORK_FOLDER']}/", "", image['File:Directory'])
+                    year_dir = deploy_subdir[0:4]  # TODO - check/validate that this = "YYYY"
+                    image_path = f"{path_base}/images/{year_dir}/{deploy_subdir}/{image['File:FileName']}"
 
                 media_map = {
                     "mediaID" : media_id,  # Required
