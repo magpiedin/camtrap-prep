@@ -1,6 +1,6 @@
 '''DRAFT - Setup camtrap-dp package, with ref to media files on AWS S3'''
 
-import json, os, re, sys
+import datetime, json, os, re, sys
 import pandas as pd
 import utils.camtrap_dp_terms as uc
 import utils.file_utils as uf
@@ -250,10 +250,46 @@ def repackage_dp_v2(obs_xls_file:str=config['INPUT_OBSERVATION_XLSX'], obs_data_
     # output to CSV for camtrap-dp
     obs_data_filename = f"{camtrap_config_urls['output']}/observations.csv"
 
-    prepped_obs_data.to_csv(
-        obs_data_filename, 
-        index=False,
+    # # # # #
+    # Fix field values/formatting where needed
+    # # # # #
+
+    # # Drop completely empty row/s
+    obs_data = obs_data.dropna(how='all')
+
+    # # TODO - Check/Fix media IDs
+    # set mediaID to ref filename from filePath if present
+    if 'filePath' in obs_data.columns:
+        if len(re.findall(r'\..+$', obs_data['filePath'].iloc[0])) > 0:
+            obs_data['mediaID'] = obs_data['filePath'].transform(lambda x: re.sub(r'http(.*/)+|\..+$', '', x))
+
+    # # TODO - Check/Fix observation IDs
+    # if observationID column is blank, form using the mediaID or filename from filePath
+    obs_data['obs_count'] = obs_data.groupby(['mediaID']).cumcount()+1
+    obs_data['observationID'] = obs_data['observationID'].fillna(
+        obs_data[['mediaID','obs_count']].astype(str).apply('_'.join, axis=1)
         )
+
+    # # TODO - Check / Re-Get EventID / Start / End from media csv
+    # if eventID / start / end is None, retrieve from media.csv where mediaID or filename matches obs csv
+
+    # # Add required fields in required format 
+    obs_data['classificationTimestamp'] = pd.to_datetime(obs_data['classificationTimestamp'], 
+                                                         format = '%m/%d/%Y')
+    obs_data['classificationTimestamp'] = obs_data['classificationTimestamp'].dt.strftime("%Y-%m-%dT%H:%M:%S%z")
+
+    current_time = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S%z")
+    obs_data['classificationTimestamp'] = obs_data['classificationTimestamp'].fillna(current_time)
+
+    # # Drop non-standard fields
+    obs_data = obs_data.drop('Common Name', axis = 1)
+    obs_data = obs_data.drop('thumbnail', axis = 1)
+    obs_data = obs_data.drop('filePath', axis = 1)
+    prepped_obs_data = obs_data.drop('favoritePhoto', axis = 1)
+
+    prepped_obs_data.to_csv(obs_data_filename, 
+                    index=False,
+                    )
 
     return prepped_obs_data
 
